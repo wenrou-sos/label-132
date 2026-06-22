@@ -1,0 +1,130 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --c-cream: #f7f3ed;
+  --c-paper: #fdfbf7;
+  --c-surface: #ffffff;
+  --c-espresso: #2b2118;
+  --c-cocoa: #5c4a3a;
+  --c-clay: #b85c38;
+  --c-sage: #6b7f5c;
+  --c-amber: #d4a24c;
+  --c-line: #e8e0d5;
+  --c-muted: #9c8e80;
+
+  --font-display: "Fraunces", "Noto Serif SC", Georgia, serif;
+  --font-body: "DM Sans", "Noto Sans SC", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "DM Mono", monospace;
+
+  font-family: var(--font-body);
+  line-height: 1.55;
+  font-weight: 400;
+  color: var(--c-espresso);
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+body {
+  background-color: var(--c-cream);
+  background-image:
+    radial-gradient(circle at 12% 8%, rgba(184, 92, 56, 0.05) 0%, transparent 38%),
+    radial-gradient(circle at 88% 92%, rgba(107, 127, 92, 0.06) 0%, transparent 42%),
+    radial-gradient(circle at 50% 50%, rgba(212, 162, 76, 0.03) 0%, transparent 60%);
+  background-attachment: fixed;
+}
+
+.font-display {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  letter-spacing: -0.01em;
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum";
+}
+
+@layer components {
+  .dash-card {
+    background: var(--c-surface);
+    border: 1px solid var(--c-line);
+    border-radius: 14px;
+    box-shadow:
+      0 1px 2px rgba(43, 33, 24, 0.04),
+      0 4px 16px rgba(43, 33, 24, 0.05);
+    transition:
+      box-shadow 0.3s ease,
+      transform 0.3s ease;
+  }
+  .dash-card:hover {
+    box-shadow:
+      0 2px 4px rgba(43, 33, 24, 0.06),
+      0 12px 32px rgba(43, 33, 24, 0.08);
+    transform: translateY(-2px);
+  }
+  .dash-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+  }
+}
+
+/* 滚动条 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--c-line);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--c-muted);
+}
+
+/* Plotly 模式栏适配 */
+.js-plotly-plot .modebar {
+  background: transparent !important;
+}
+.js-plotly-plot .modebar-btn {
+  fill: var(--c-muted) !important;
+}
+.js-plotly-plot .modebar-btn:hover {
+  fill: var(--c-clay) !important;
+}
+
+/* 进入动画 */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.fade-up {
+  animation: fadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
