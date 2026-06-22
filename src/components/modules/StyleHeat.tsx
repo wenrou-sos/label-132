@@ -5,13 +5,20 @@ import type { Data } from "plotly.js-dist-min";
 import { STYLE_COLORS, STYLE_LABELS } from "@/lib/theme";
 import type { StyleHeatData } from "@/types/api";
 
-export default function StyleHeat({ data }: { data: StyleHeatData | null }) {
+interface StyleHeatProps {
+  data: StyleHeatData | null;
+  compareData: StyleHeatData | null;
+}
+
+export default function StyleHeat({ data, compareData }: StyleHeatProps) {
   const { traces, neoYoy } = useMemo(() => {
     if (!data) return { traces: [] as Data[], neoYoy: 0 };
-    const traces: Data[] = data.styles.map((s) => {
+    const traces: Data[] = [];
+
+    for (const s of data.styles) {
       const isModern = s.name === "modern";
       const isNeo = s.name === "neo_chinese";
-      return {
+      traces.push({
         type: "scatter",
         mode: "lines",
         name: s.label,
@@ -24,11 +31,35 @@ export default function StyleHeat({ data }: { data: StyleHeatData | null }) {
         },
         opacity: isModern || isNeo ? 1 : 0.5,
         hovertemplate: `<b>${s.label}</b><br>%{x}<br>热度 %{y:.1f}<extra></extra>`,
-      };
-    });
+      } as Data);
+    }
+
+    if (compareData && compareData.months.length) {
+      for (const s of compareData.styles) {
+        const isModern = s.name === "modern";
+        const isNeo = s.name === "neo_chinese";
+        traces.push({
+          type: "scatter",
+          mode: "lines",
+          name: `${s.label}（对比期）`,
+          x: compareData.months,
+          y: s.values,
+          line: {
+            color: STYLE_COLORS[s.name],
+            width: isModern ? 2.5 : isNeo ? 2.5 : 1.5,
+            dash: "dot",
+            shape: "spline",
+          },
+          opacity: 0.35,
+          showlegend: false,
+          hovertemplate: `<b>${s.label} 对比</b><br>%{x}<br>热度 %{y:.1f}<extra></extra>`,
+        } as Data);
+      }
+    }
+
     const neo = data.styles.find((s) => s.name === "neo_chinese");
     return { traces, neoYoy: neo?.yoy ?? 0 };
-  }, [data]);
+  }, [data, compareData]);
 
   if (!data) {
     return (

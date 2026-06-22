@@ -4,7 +4,12 @@ import PlotlyChart from "@/components/PlotlyChart";
 import type { Data } from "plotly.js-dist-min";
 import type { MarketStructureData } from "@/types/api";
 
-export default function MarketStructure({ data }: { data: MarketStructureData | null }) {
+interface MarketStructureProps {
+  data: MarketStructureData | null;
+  compareData: MarketStructureData | null;
+}
+
+export default function MarketStructure({ data, compareData }: MarketStructureProps) {
   const traces = useMemo<Data[]>(() => {
     if (!data) return [];
     const histMonths = data.history.map((d) => d.month);
@@ -17,7 +22,7 @@ export default function MarketStructure({ data }: { data: MarketStructureData | 
     const readyFc = [readyHist[readyHist.length - 1], ...data.forecast.map((d) => d.ready)];
     const fcX = [linkMonth, ...fcMonths];
 
-    return [
+    const result: Data[] = [
       {
         type: "scatter",
         mode: "lines",
@@ -59,7 +64,39 @@ export default function MarketStructure({ data }: { data: MarketStructureData | 
         hovertemplate: "<b>成品预测</b><br>%{x}<br>占比 %{y:.1f}%<extra></extra>",
       },
     ];
-  }, [data]);
+
+    if (compareData && compareData.history.length) {
+      const cmpHist = compareData.history.map((d) => d.month);
+      const cmpCustom = compareData.history.map((d) => d.custom);
+      const cmpReady = compareData.history.map((d) => d.ready);
+      result.push(
+        {
+          type: "scatter",
+          mode: "lines",
+          name: "全屋定制（对比期）",
+          x: cmpHist,
+          y: cmpCustom,
+          line: { color: "#B85C38", width: 2, dash: "dot" },
+          opacity: 0.45,
+          showlegend: false,
+          hovertemplate: "<b>全屋定制 对比</b><br>%{x}<br>占比 %{y:.1f}%<extra></extra>",
+        },
+        {
+          type: "scatter",
+          mode: "lines",
+          name: "成品家具（对比期）",
+          x: cmpHist,
+          y: cmpReady,
+          line: { color: "#6B7F5C", width: 2, dash: "dot" },
+          opacity: 0.45,
+          showlegend: false,
+          hovertemplate: "<b>成品家具 对比</b><br>%{x}<br>占比 %{y:.1f}%<extra></extra>",
+        }
+      );
+    }
+
+    return result;
+  }, [data, compareData]);
 
   if (!data) {
     return (

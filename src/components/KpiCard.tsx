@@ -5,6 +5,9 @@ interface KpiCardProps {
   value: string;
   unit?: string;
   delta?: number;
+  compareValue?: string;
+  compareDelta?: number;
+  isDeltaAbsolute?: boolean;
   icon: LucideIcon;
   accent: string;
   hint?: string;
@@ -15,11 +18,15 @@ export default function KpiCard({
   value,
   unit,
   delta,
+  compareValue,
+  compareDelta,
+  isDeltaAbsolute,
   icon: Icon,
   accent,
   hint,
 }: KpiCardProps) {
   const positive = (delta ?? 0) >= 0;
+  const comparePositive = (compareDelta ?? 0) >= 0;
   return (
     <div className="flex items-center gap-3 min-w-0">
       <div
@@ -28,7 +35,7 @@ export default function KpiCard({
       >
         <Icon size={18} strokeWidth={1.8} />
       </div>
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <p className="text-[11px] text-muted leading-none mb-1">{label}</p>
         <div className="flex items-baseline gap-1.5">
           <span className="font-mono font-semibold text-espresso text-lg leading-none truncate">
@@ -44,6 +51,20 @@ export default function KpiCard({
             </span>
           )}
         </div>
+        {compareValue !== undefined && (
+          <div className="flex items-baseline gap-1.5 mt-0.5">
+            <span className="text-[10px] text-muted">对比期</span>
+            <span className="font-mono text-[12px] text-muted/80">{compareValue}</span>
+            {compareDelta !== undefined && (
+              <span
+                className="font-mono text-[10px] ml-0.5"
+                style={{ color: comparePositive ? "#6B7F5C" : "#B85C38" }}
+              >
+                {comparePositive ? "▲" : "▼"} {isDeltaAbsolute ? ` ${Math.abs(compareDelta).toFixed(1)}${unit ?? ""}` : ` ${Math.abs(compareDelta).toFixed(1)}%`}
+              </span>
+            )}
+          </div>
+        )}
         {hint && <p className="text-[10px] text-muted/70 mt-0.5 truncate">{hint}</p>}
       </div>
     </div>

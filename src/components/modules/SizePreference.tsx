@@ -1,15 +1,24 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import ChartCard from "@/components/ChartCard";
 import PlotlyChart from "@/components/PlotlyChart";
 import type { Data } from "plotly.js-dist-min";
 import { HOUSE_TYPE_COLORS } from "@/lib/theme";
 import type { SizePreferenceData } from "@/types/api";
 
-export default function SizePreference({ data }: { data: SizePreferenceData | null }) {
+interface SizePreferenceProps {
+  data: SizePreferenceData | null;
+  compareData: SizePreferenceData | null;
+  compareMode?: boolean;
+}
+
+export default function SizePreference({ data, compareData, compareMode }: SizePreferenceProps) {
+  const [view, setView] = useState<"base" | "compare">("base");
+  const activeData = compareMode && view === "compare" ? compareData : data;
+
   const traces = useMemo<Data[]>(() => {
-    if (!data) return [];
+    if (!activeData) return [];
     const allItems: { label: string; popularity: number; color: string; highlight: boolean }[] = [];
-    for (const ht of data.houseTypes) {
+    for (const ht of activeData.houseTypes) {
       for (const item of ht.items) {
         allItems.push({
           label: `${ht.name} · ${item.furniture}`,
@@ -19,7 +28,6 @@ export default function SizePreference({ data }: { data: SizePreferenceData | nu
         });
       }
     }
-    // 按热度排序，高的在上
     allItems.sort((a, b) => a.popularity - b.popularity);
 
     return [
@@ -41,7 +49,7 @@ export default function SizePreference({ data }: { data: SizePreferenceData | nu
         hovertemplate: "<b>%{y}</b><br>流行度 %{x}<extra></extra>",
       },
     ];
-  }, [data]);
+  }, [activeData]);
 
   if (!data) {
     return (
@@ -50,6 +58,8 @@ export default function SizePreference({ data }: { data: SizePreferenceData | nu
       </ChartCard>
     );
   }
+
+  const toggleView = () => setView((v) => (v === "base" ? "compare" : "base"));
 
   return (
     <ChartCard
@@ -61,7 +71,18 @@ export default function SizePreference({ data }: { data: SizePreferenceData | nu
           ★ 畅销单品
         </span>
       }
-      footer="小户型畅销：伸缩餐桌（0.9-1.4m）与多功能沙发床（1.5m 折叠）需求最高"
+      footer={
+        compareMode ? (
+          <button
+            onClick={toggleView}
+            className="text-xs text-muted hover:text-clay transition-colors underline underline-offset-2 decoration-dashed"
+          >
+            当前展示：{view === "base" ? "基准期" : "对比期"} · 点击切换
+          </button>
+        ) : (
+          "小户型畅销：伸缩餐桌（0.9-1.4m）与多功能沙发床（1.5m 折叠）需求最高"
+        )
+      }
     >
       <PlotlyChart
         data={traces}

@@ -8,12 +8,14 @@ import type { CategoryTrendsData } from "@/types/api";
 
 interface CategoryTrendsProps {
   data: CategoryTrendsData | null;
+  compareData: CategoryTrendsData | null;
   activeCategories: string[];
   onToggle: (key: string) => void;
 }
 
 export default function CategoryTrends({
   data,
+  compareData,
   activeCategories,
   onToggle,
 }: CategoryTrendsProps) {
@@ -40,28 +42,46 @@ export default function CategoryTrends({
       sort: false,
     };
 
-    const line: Data[] = last.categories
-      .filter((c) => activeCategories.includes(c.name))
-      .map((c) => {
-        const months = data.months.map((m) => m.month);
-        const yoy = data.months.map((m) => {
+    const line: Data[] = [];
+    for (const c of last.categories) {
+      if (!activeCategories.includes(c.name)) continue;
+      const months = data.months.map((m) => m.month);
+      const yoy = data.months.map((m) => {
+        const cat = m.categories.find((x) => x.name === c.name);
+        return cat ? cat.yoy : null;
+      });
+      line.push({
+        type: "scatter",
+        mode: "lines+markers",
+        name: c.label,
+        x: months,
+        y: yoy,
+        line: { color: CATEGORY_COLORS[c.name], width: 2, shape: "spline" },
+        marker: { size: 4 },
+        hovertemplate: `<b>${c.label}</b><br>%{x}<br>同比 %{y:.1f}%<extra></extra>`,
+      } as Data);
+      if (compareData && compareData.months.length) {
+        const cmpMonths = compareData.months.map((m) => m.month);
+        const cmpYoy = compareData.months.map((m) => {
           const cat = m.categories.find((x) => x.name === c.name);
           return cat ? cat.yoy : null;
         });
-        return {
+        line.push({
           type: "scatter",
-          mode: "lines+markers",
-          name: c.label,
-          x: months,
-          y: yoy,
-          line: { color: CATEGORY_COLORS[c.name], width: 2, shape: "spline" },
-          marker: { size: 4 },
-          hovertemplate: `<b>${c.label}</b><br>%{x}<br>同比 %{y:.1f}%<extra></extra>`,
-        } as Data;
-      });
+          mode: "lines",
+          name: `${c.label}（对比期）`,
+          x: cmpMonths,
+          y: cmpYoy,
+          line: { color: CATEGORY_COLORS[c.name], width: 2, dash: "dash", shape: "spline" },
+          opacity: 0.45,
+          showlegend: false,
+          hovertemplate: `<b>${c.label} 对比</b><br>%{x}<br>同比 %{y:.1f}%<extra></extra>`,
+        } as Data);
+      }
+    }
 
     return { donutData: [donut], lineData: line, latestMonth: last.month };
-  }, [data, activeCategories]);
+  }, [data, compareData, activeCategories]);
 
   if (!data) {
     return (

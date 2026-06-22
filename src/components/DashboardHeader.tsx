@@ -1,4 +1,4 @@
-import { DatePicker, Button, Dropdown, message } from "antd";
+import { DatePicker, Button, Dropdown, Switch, message } from "antd";
 import type { RangePickerProps } from "antd/es/date-picker";
 import {
   Armchair,
@@ -7,6 +7,7 @@ import {
   Sparkles,
   Download,
   CalendarRange,
+  GitCompare,
 } from "lucide-react";
 import dayjs from "dayjs";
 import KpiCard from "@/components/KpiCard";
@@ -17,20 +18,38 @@ const { RangePicker } = DatePicker;
 
 interface DashboardHeaderProps {
   summary: SummaryData | null;
+  compareSummary: SummaryData | null;
   start: string;
   end: string;
+  compareMode: boolean;
+  compareStart: string;
+  compareEnd: string;
   onRangeChange: (start: string, end: string) => void;
+  onCompareModeChange: (on: boolean) => void;
+  onCompareRangeChange: (start: string, end: string) => void;
 }
 
 export default function DashboardHeader({
   summary,
+  compareSummary,
   start,
   end,
+  compareMode,
+  compareStart,
+  compareEnd,
   onRangeChange,
+  onCompareModeChange,
+  onCompareRangeChange,
 }: DashboardHeaderProps) {
   const handleRangeChange: RangePickerProps["onChange"] = (dates, dateStrings) => {
     if (dates && dateStrings[0] && dateStrings[1]) {
       onRangeChange(dateStrings[0], dateStrings[1]);
+    }
+  };
+
+  const handleCompareRangeChange: RangePickerProps["onChange"] = (dates, dateStrings) => {
+    if (dates && dateStrings[0] && dateStrings[1]) {
+      onCompareRangeChange(dateStrings[0], dateStrings[1]);
     }
   };
 
@@ -56,6 +75,11 @@ export default function DashboardHeader({
     ),
   }));
 
+  const diffPct = (a: number | undefined, b: number | undefined): number | undefined => {
+    if (a === undefined || b === undefined || b === 0) return undefined;
+    return ((a - b) / b) * 100;
+  };
+
   return (
     <header className="sticky top-0 z-30 bg-paper/85 backdrop-blur-md border-b border-line">
       <div className="px-4 md:px-6 py-3 flex items-center justify-between gap-4 flex-wrap">
@@ -74,6 +98,17 @@ export default function DashboardHeader({
         </div>
 
         <div className="flex items-center gap-2 md:gap-3 flex-wrap">
+          <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-line/30">
+            <GitCompare size={15} className="text-clay" />
+            <span className="text-xs text-espresso">对比模式</span>
+            <Switch
+              size="small"
+              checked={compareMode}
+              onChange={onCompareModeChange}
+              style={{ backgroundColor: compareMode ? "#B85C38" : undefined }}
+            />
+          </div>
+
           <div className="flex items-center gap-1.5">
             <CalendarRange size={16} className="text-muted" />
             <RangePicker
@@ -85,6 +120,20 @@ export default function DashboardHeader({
               style={{ width: 220 }}
             />
           </div>
+
+          {compareMode && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] text-muted whitespace-nowrap">对比期</span>
+              <RangePicker
+                picker="month"
+                size="middle"
+                value={[dayjs(compareStart), dayjs(compareEnd)]}
+                onChange={handleCompareRangeChange}
+                allowClear={false}
+                style={{ width: 200 }}
+              />
+            </div>
+          )}
 
           <Dropdown menu={{ items: exportItems }} placement="bottomRight">
             <Button icon={<Download size={15} />} className="flex items-center">
@@ -100,6 +149,8 @@ export default function DashboardHeader({
           value={summary ? summary.totalSales.toLocaleString() : "—"}
           unit="万元"
           delta={summary?.yoyGrowth}
+          compareValue={compareMode && compareSummary ? compareSummary.totalSales.toLocaleString() : undefined}
+          compareDelta={compareMode && compareSummary ? diffPct(summary?.totalSales, compareSummary.totalSales) : undefined}
           icon={TrendingUp}
           accent="#B85C38"
           hint="家具六大品类合计"
@@ -109,6 +160,9 @@ export default function DashboardHeader({
           value={summary ? `${summary.yoyGrowth.toFixed(1)}` : "—"}
           unit="%"
           delta={summary?.yoyGrowth}
+          compareValue={compareMode && compareSummary ? `${compareSummary.yoyGrowth.toFixed(1)}` : undefined}
+          compareDelta={compareMode && compareSummary ? summary.yoyGrowth - compareSummary.yoyGrowth : undefined}
+          isDeltaAbsolute
           icon={TrendingUp}
           accent="#6B7F5C"
           hint="较去年同期"
@@ -118,12 +172,16 @@ export default function DashboardHeader({
           value={summary ? `${summary.customShare.toFixed(1)}` : "—"}
           unit="%"
           icon={Layers}
+          compareValue={compareMode && compareSummary ? `${compareSummary.customShare.toFixed(1)}` : undefined}
+          compareDelta={compareMode && compareSummary ? summary.customShare - compareSummary.customShare : undefined}
+          isDeltaAbsolute
           accent="#D4A24C"
           hint="成品家具占比递减"
         />
         <KpiCard
           label="热度第一风格"
           value={summary?.topStyle ?? "—"}
+          compareValue={compareMode && compareSummary ? compareSummary.topStyle : undefined}
           icon={Sparkles}
           accent="#3D5A80"
           hint="搜索热度指数最高"

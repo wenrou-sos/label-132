@@ -1,18 +1,26 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import ChartCard from "@/components/ChartCard";
 import PlotlyChart from "@/components/PlotlyChart";
 import type { Data } from "plotly.js-dist-min";
 import { DECISION_COLORS } from "@/lib/theme";
 import type { DecisionFactorsData } from "@/types/api";
 
-export default function DecisionFactors({ data }: { data: DecisionFactorsData | null }) {
-  const { traces, insights } = useMemo(() => {
-    if (!data) return { traces: [] as Data[], insights: [] as string[] };
+interface DecisionFactorsProps {
+  data: DecisionFactorsData | null;
+  compareData: DecisionFactorsData | null;
+  compareMode?: boolean;
+}
 
-    // 每个维度取权重最高的细分作为代表
+export default function DecisionFactors({ data, compareData, compareMode }: DecisionFactorsProps) {
+  const [view, setView] = useState<"base" | "compare">("base");
+  const activeData = compareMode && view === "compare" ? compareData : data;
+
+  const { traces, insights } = useMemo(() => {
+    if (!activeData) return { traces: [] as Data[], insights: [] as string[] };
+
     const topByDim: Record<string, { name: string; values: number[] }> = {};
-    for (const s of data.series) {
-      const ownIdx = data.axes.indexOf(s.dimension);
+    for (const s of activeData.series) {
+      const ownIdx = activeData.axes.indexOf(s.dimension);
       const ownVal = s.values[ownIdx];
       if (!topByDim[s.dimension] || ownVal > topByDim[s.dimension].values[ownIdx]) {
         topByDim[s.dimension] = { name: s.name, values: s.values };
@@ -22,7 +30,7 @@ export default function DecisionFactors({ data }: { data: DecisionFactorsData | 
     const traces: Data[] = Object.entries(topByDim).map(([dim, info]) => ({
       type: "scatterpolar",
       r: [...info.values, info.values[0]],
-      theta: [...data.axes, data.axes[0]],
+      theta: [...activeData.axes, activeData.axes[0]],
       name: info.name,
       fill: "toself",
       fillcolor: (DECISION_COLORS[dim] ?? "#999") + "20",
@@ -31,12 +39,12 @@ export default function DecisionFactors({ data }: { data: DecisionFactorsData | 
     }));
 
     const insights = Object.entries(topByDim).map(([dim, info]) => {
-      const ownIdx = data.axes.indexOf(dim);
+      const ownIdx = activeData.axes.indexOf(dim);
       return `${dim}·${info.name.split("-")[1] ?? ""} (${info.values[ownIdx]}%)`;
     });
 
     return { traces, insights };
-  }, [data]);
+  }, [activeData]);
 
   if (!data) {
     return (
@@ -45,6 +53,8 @@ export default function DecisionFactors({ data }: { data: DecisionFactorsData | 
       </ChartCard>
     );
   }
+
+  const toggleView = () => setView((v) => (v === "base" ? "compare" : "base"));
 
   return (
     <ChartCard
@@ -56,7 +66,18 @@ export default function DecisionFactors({ data }: { data: DecisionFactorsData | 
           ENF级
         </span>
       }
-      footer={`主导因素：${insights.join("  ·  ")}`}
+      footer={
+        compareMode ? (
+          <button
+            onClick={toggleView}
+            className="text-xs text-muted hover:text-clay transition-colors underline underline-offset-2 decoration-dashed"
+          >
+            当前展示：{view === "base" ? "基准期" : "对比期"} · 点击切换
+          </button>
+        ) : (
+          `主导因素：${insights.join("  ·  ")}`
+        )
+      }
     >
       <PlotlyChart
         data={traces}

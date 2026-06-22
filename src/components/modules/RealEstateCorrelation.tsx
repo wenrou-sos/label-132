@@ -7,12 +7,14 @@ import type { RealEstateData } from "@/types/api";
 
 interface RealEstateCorrelationProps {
   data: RealEstateData | null;
+  compareData: RealEstateData | null;
   lag: number;
   onLagChange: (lag: number) => void;
 }
 
 export default function RealEstateCorrelation({
   data,
+  compareData,
   lag,
   onLagChange,
 }: RealEstateCorrelationProps) {
@@ -27,7 +29,7 @@ export default function RealEstateCorrelation({
     const fcSales = [sales[sales.length - 1], ...data.forecast.map((d) => d.predictedSales)];
     const fcX = [linkMonth, ...fcMonths];
 
-    return [
+    const result: Data[] = [
       {
         type: "bar",
         name: "新房交付量",
@@ -56,7 +58,53 @@ export default function RealEstateCorrelation({
         hovertemplate: "<b>预测销售</b><br>%{x}<br>%{y:.0f} 万元<extra></extra>",
       },
     ];
-  }, [data]);
+
+    if (compareData && compareData.history.length) {
+      const cmpHist = compareData.history.map((d) => d.month);
+      const cmpDelivery = compareData.history.map((d) => d.delivery);
+      const cmpSales = compareData.history.map((d) => d.sales);
+      const cmpFc = [cmpSales[cmpSales.length - 1], ...compareData.forecast.map((d) => d.predictedSales)];
+      const cmpLink = cmpHist[cmpHist.length - 1];
+      const cmpFcX = [cmpLink, ...compareData.forecast.map((d) => d.month)];
+      result.push(
+        {
+          type: "bar",
+          name: "新房交付（对比期）",
+          x: cmpHist,
+          y: cmpDelivery,
+          yaxis: "y2",
+          marker: { color: "rgba(61,90,128,0.15)" },
+          opacity: 0.45,
+          showlegend: false,
+          hovertemplate: "<b>新房交付 对比</b><br>%{x}<br>%{y:.0f} 万套<extra></extra>",
+        },
+        {
+          type: "scatter",
+          mode: "lines",
+          name: "家具销售（对比期）",
+          x: cmpHist,
+          y: cmpSales,
+          line: { color: "#B85C38", width: 2, dash: "dash" },
+          opacity: 0.45,
+          showlegend: false,
+          hovertemplate: "<b>家具销售 对比</b><br>%{x}<br>%{y:.0f} 万元<extra></extra>",
+        },
+        {
+          type: "scatter",
+          mode: "lines",
+          name: "销售预测（对比期）",
+          x: cmpFcX,
+          y: cmpFc,
+          line: { color: "#B85C38", width: 1.5, dash: "dot" },
+          opacity: 0.3,
+          showlegend: false,
+          hovertemplate: "<b>预测销售 对比</b><br>%{x}<br>%{y:.0f} 万元<extra></extra>",
+        }
+      );
+    }
+
+    return result;
+  }, [data, compareData]);
 
   if (!data) {
     return (
