@@ -183,26 +183,30 @@ def get_style_heat(start: str | None = None, end: str | None = None) -> dict:
 # ---------------------------------------------------------------------------
 def get_decision_factors(start: str | None = None, end: str | None = None) -> dict:
     df = _load("decision_factors.csv")
-    axes = df["dimension"].unique().tolist()
-    segments_by_dim = {}
-    for dim in axes:
-        sub = df[df["dimension"] == dim].sort_values("weight", ascending=False)
-        segments_by_dim[dim] = sub["segment"].tolist()
+    if "month" in df.columns:
+        df = _filter_months(df, start, end)
+    # 聚合：对同一维度内的同一segment取均值（处理多月数据）
+    grouped = (
+        df.groupby(["dimension", "segment"])["weight"].mean().reset_index()
+    )
 
-    # 构建系列：每个细分维度一条雷达数据（按其所属维度位置放置权重）
+    axes = df["dimension"].unique().tolist()
+    # 维度间的平均权重（用于雷达图的"其他维度"位置）
+    dim_avg = grouped.groupby("dimension")["weight"].mean().to_dict()
+
     series = []
     for dim in axes:
-        sub = df[df["dimension"] == dim].sort_values("weight", ascending=False)
+        sub = grouped[grouped["dimension"] == dim].sort_values("weight", ascending=False)
         for _, row in sub.iterrows():
             values = []
             for a in axes:
                 if a == dim:
                     values.append(float(row["weight"]))
                 else:
-                    same_dim = df[df["dimension"] == a]
-                    avg = float(same_dim["weight"].mean())
-                    values.append(round(avg, 1))
-            series.append({"name": f"{dim}-{row['segment']}", "dimension": dim, "values": values})
+                    values.append(round(float(dim_avg.get(a, 0)), 1))
+            series.append(
+                {"name": f"{dim}-{row['segment']}", "dimension": dim, "values": values}
+            )
     return {"axes": axes, "series": series}
 
 
@@ -211,14 +215,23 @@ def get_decision_factors(start: str | None = None, end: str | None = None) -> di
 # ---------------------------------------------------------------------------
 def get_size_preference(start: str | None = None, end: str | None = None) -> dict:
     df = _load("size_preference.csv")
+    if "month" in df.columns:
+        df = _filter_months(df, start, end)
+    # 聚合：对 house_type+furniture+size 组合取 popularity 均值，is_hot 取 max（只要有一个月是爆款就保留高亮）
+    grouped = (
+        df.groupby(["house_type", "furniture", "size"])
+        .agg(popularity=("popularity", "mean"), is_hot=("is_hot", "max"))
+        .reset_index()
+    )
+
     house_types = []
     for ht in ["小户型", "中户型", "大户型"]:
-        sub = df[df["house_type"] == ht].sort_values("popularity", ascending=False)
+        sub = grouped[grouped["house_type"] == ht].sort_values("popularity", ascending=False)
         items = [
             {
                 "furniture": r["furniture"],
                 "size": r["size"],
-                "popularity": int(r["popularity"]),
+                "popularity": int(round(r["popularity"])),
                 "highlight": bool(r["is_hot"]),
             }
             for _, r in sub.iterrows()
@@ -242,53 +255,63 @@ def get_realestate_correlation(lag: int = 9, start: str | None = None, end: str 
     df = _load("realestate_sales.csv")
     df = _filter_months(df, start, end)
     df = df[df["month"] >= "2022-01"].reset_index(drop=True)
+    if df.empty:
+        return {"history": [], "correlation": 0.0, "optimalLag": lag, "forecast": []}
 
     delivery = df["new_house_delivery"].values
     sales = df["furniture_sales"].values
+    n = len(sales)
 
-    # 寻找最优滞后期（6-12 月）— 仅用于参考展示
-    optimal_lag = lag
+    # 安全：滞后月数不能超过数据长度-1，否则没有足够的配对点
+    safe_lag = max(1, min(lag, max(1, n - 1)))
+
+    # 寻找最优滞后期（6-12 月，但不超过数据长度限制）— 仅用于参考展示
+    optimal_lag = safe_lag
     optimal_corr = 0.0
-    for l in range(6, 13):
-        if len(sales) > l:
-            d_shifted = delivery[:-l]
-            s_aligned = sales[l:]
-            if len(d_shifted) > 2 and len(s_aligned) == len(d_shifted):
-                corr = float(np.corrcoef(d_shifted, s_aligned)[0, 1])
-                if abs(corr) > abs(optimal_corr):
-                    optimal_corr = corr
-                    optimal_lag = l
+    search_max = min(12, n - 2)
+    if search_max >= 6:
+        for l in range(6, search_max + 1):
+            if n > l:
+                d_shifted = delivery[:-l]
+                s_aligned = sales[l:]
+                if len(d_shifted) > 2 and len(s_aligned) == len(d_shifted):
+                    corr = float(np.corrcoef(d_shifted, s_aligned)[0, 1])
+                    if not np.isnan(corr) and abs(corr) > abs(optimal_corr):
+                        optimal_corr = corr
+                        optimal_lag = l
 
-    # 使用用户选择的滞后期计算相关系数
-    l = lag
-    if len(sales) > l:
+    # 使用安全滞后期计算相关系数
+    l = safe_lag
+    correlation = 0.0
+    if n > l:
         d_shifted = delivery[:-l]
         s_aligned = sales[l:]
         if len(d_shifted) > 2 and len(s_aligned) == len(d_shifted):
-            correlation = float(np.corrcoef(d_shifted, s_aligned)[0, 1])
-        else:
-            correlation = 0.0
-    else:
-        correlation = 0.0
+            c = float(np.corrcoef(d_shifted, s_aligned)[0, 1])
+            correlation = 0.0 if np.isnan(c) else c
 
     history = [
         {"month": r["month"], "delivery": float(r["new_house_delivery"]), "sales": float(r["furniture_sales"])}
         for _, r in df.iterrows()
     ]
 
-    # 基于交付量预测未来 12 个月家具销售（用用户选择的滞后期映射）
+    # 基于交付量预测未来 12 个月家具销售（用安全滞后期映射）
     last_month = df.iloc[-1]["month"]
     forecast = []
+    # 计算比值：销售 / 滞后交付，长度足够时才按映射，否则用最近值外推
+    if n > l and delivery[-l]:
+        ratio = sales[-1] / delivery[-l]
+    else:
+        ratio = 1.0
     for i in range(1, 13):
         m = _shift_month(last_month, i)
-        src_idx = len(delivery) - l + i - 1
-        if 0 <= src_idx < len(delivery):
+        src_idx = n - l + i - 1
+        if 0 <= src_idx < n:
             base = delivery[src_idx]
-            # 简单线性映射 + 趋势
-            ratio = sales[-1] / delivery[-l] if delivery[-l] else 1
             pred = base * ratio
         else:
-            pred = sales[-1]
+            # 数据不足时，用最近销售值做温和外推
+            pred = sales[-1] if n > 0 else 0
         forecast.append({"month": m, "predictedSales": round(float(pred), 1)})
 
     return {

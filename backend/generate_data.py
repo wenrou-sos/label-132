@@ -126,65 +126,113 @@ pd.DataFrame(style_records).to_csv(
 )
 
 # ---------------------------------------------------------------------------
-# 4. 消费决策因素权重
+# 4. 消费决策因素权重（按月变化）
 # ---------------------------------------------------------------------------
-# 四大维度细分权重（0-100），归一化为占比
+# 四大维度细分权重基线（0-100），各月在基线上加上随时间变化的漂移
 DECISION_DIMS = {
     "材质": {
-        "实木": 34, "板式": 22, "布艺": 18, "皮质": 14,
+        "实木": (34, 38),   # 实木热度递增
+        "板式": (22, 20),
+        "布艺": (18, 16),
+        "皮质": (14, 16),
     },
     "价格段": {
-        "5千以下": 28, "5千-1万": 31, "1万-2万": 24, "2万以上": 17,
+        "5千以下": (28, 24),   # 低价段逐年下行，消费升级
+        "5千-1万": (31, 34),
+        "1万-2万": (24, 27),
+        "2万以上": (17, 20),
     },
     "品牌": {
-        "一线品牌": 33, "二线品牌": 27, "设计师品牌": 22, "白牌": 18,
+        "一线品牌": (33, 37),
+        "二线品牌": (27, 25),
+        "设计师品牌": (22, 25),
+        "白牌": (18, 13),
     },
     "环保等级": {
-        "ENF级": 38, "E0级": 32, "E1级": 18, "未标注": 12,
+        "ENF级": (38, 46),   # ENF 快速上升
+        "E0级": (32, 31),
+        "E1级": (18, 15),
+        "未标注": (12, 7),
     },
 }
 
 dec_records = []
-for dim, subs in DECISION_DIMS.items():
-    for sub, weight in subs.items():
-        dec_records.append(
-            {"dimension": dim, "segment": sub, "weight": weight}
-        )
+for month_idx, month in enumerate(MONTHS):
+    t = month_idx / (N - 1)  # 0→1
+    for dim, subs in DECISION_DIMS.items():
+        dim_vals = {}
+        for sub, (start_w, end_w) in subs.items():
+            base = start_w + (end_w - start_w) * t
+            season = 1.5 * np.sin(2 * np.pi * (month_idx + 1) / 12)
+            noise = np.random.normal(0, 0.6)
+            val = round(max(5, base + season + noise), 1)
+            dim_vals[sub] = val
+        # 维度内归一化：让同一维度的权重总和约为 100，保持相对比例
+        total = sum(dim_vals.values())
+        for sub, v in dim_vals.items():
+            dec_records.append(
+                {
+                    "month": month,
+                    "dimension": dim,
+                    "segment": sub,
+                    "weight": round(v / total * 100, 1),
+                }
+            )
 pd.DataFrame(dec_records).to_csv(
     os.path.join(DATA_DIR, "decision_factors.csv"), index=False
 )
 
 # ---------------------------------------------------------------------------
-# 5. 尺寸偏好（按户型）
+# 5. 尺寸偏好（按户型，按月变化）
 # ---------------------------------------------------------------------------
-SIZE_DATA = [
+# 每条尺寸数据 baseline popularity，按月轻微漂移（小户型伸缩家具逐年更火）
+SIZE_BASE = [
     # 小户型
-    ("小户型", "沙发", "双人位 1.6-1.8m", 82, False),
-    ("小户型", "沙发床", "多功能折叠 1.5m", 91, True),
-    ("小户型", "餐桌", "伸缩款 0.9-1.4m", 88, True),
-    ("小户型", "床", "1.5m 矮床带储物", 76, False),
-    ("小户型", "衣柜", "入墙式定制 2.0m", 71, False),
-    ("小户型", "书桌", "折叠壁挂 0.8m", 68, False),
+    ("小户型", "沙发", "双人位 1.6-1.8m", 82, 84, False),
+    ("小户型", "沙发床", "多功能折叠 1.5m", 87, 94, True),
+    ("小户型", "餐桌", "伸缩款 0.9-1.4m", 85, 92, True),
+    ("小户型", "床", "1.5m 矮床带储物", 73, 77, False),
+    ("小户型", "衣柜", "入墙式定制 2.0m", 68, 75, False),
+    ("小户型", "书桌", "折叠壁挂 0.8m", 64, 72, False),
     # 中户型
-    ("中户型", "沙发", "三人位+贵妃 2.8m", 79, False),
-    ("中户型", "沙发床", "抽拉式 1.8m", 64, False),
-    ("中户型", "餐桌", "四人位 1.4m", 74, False),
-    ("中户型", "床", "1.8m 实木床", 81, False),
-    ("中户型", "衣柜", "平开门定制 2.4m", 77, False),
-    ("中户型", "书桌", "1.2m 带书架", 70, False),
+    ("中户型", "沙发", "三人位+贵妃 2.8m", 77, 81, False),
+    ("中户型", "沙发床", "抽拉式 1.8m", 63, 66, False),
+    ("中户型", "餐桌", "四人位 1.4m", 73, 76, False),
+    ("中户型", "床", "1.8m 实木床", 79, 83, False),
+    ("中户型", "衣柜", "平开门定制 2.4m", 74, 79, False),
+    ("中户型", "书桌", "1.2m 带书架", 68, 73, False),
     # 大户型
-    ("大户型", "沙发", "L型组合 3.5m+", 73, False),
-    ("大户型", "沙发床", "极少选购", 22, False),
-    ("大户型", "餐桌", "六人位 1.8m+", 69, False),
-    ("大户型", "床", "2.0m 真皮大床", 75, False),
-    ("大户型", "衣柜", "步入式衣帽间", 66, False),
-    ("大户型", "书桌", "1.6m 整木大桌", 63, False),
+    ("大户型", "沙发", "L型组合 3.5m+", 71, 76, False),
+    ("大户型", "沙发床", "极少选购", 20, 23, False),
+    ("大户型", "餐桌", "六人位 1.8m+", 67, 72, False),
+    ("大户型", "床", "2.0m 真皮大床", 73, 78, False),
+    ("大户型", "衣柜", "步入式衣帽间", 63, 69, False),
+    ("大户型", "书桌", "1.6m 整木大桌", 60, 66, False),
 ]
-size_df = pd.DataFrame(
-    SIZE_DATA, columns=["house_type", "furniture", "size", "popularity", "is_hot"]
+
+size_records = []
+for month_idx, month in enumerate(MONTHS):
+    t = month_idx / (N - 1)
+    seas_ = 1.2 * np.sin(2 * np.pi * (month_idx + 2) / 12)
+    for ht, furn, sz, start_p, end_p, is_hot in SIZE_BASE:
+        base = start_p + (end_p - start_p) * t
+        # 小户型热销款（伸缩餐桌、沙发床）Q4有额外热度
+        extra = 2.0 * seas_ if is_hot and ht == "小户型" else seas_
+        noise = np.random.normal(0, 0.9)
+        pop = int(round(max(10, min(100, base + extra + noise))))
+        size_records.append(
+            {
+                "month": month,
+                "house_type": ht,
+                "furniture": furn,
+                "size": sz,
+                "popularity": pop,
+                "is_hot": int(is_hot),
+            }
+        )
+pd.DataFrame(size_records).to_csv(
+    os.path.join(DATA_DIR, "size_preference.csv"), index=False
 )
-size_df["is_hot"] = size_df["is_hot"].astype(int)
-size_df.to_csv(os.path.join(DATA_DIR, "size_preference.csv"), index=False)
 
 # ---------------------------------------------------------------------------
 # 6. 地产关联（新房交付量 vs 家具销售）
