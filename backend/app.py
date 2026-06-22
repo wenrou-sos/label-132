@@ -39,28 +39,38 @@ def category_trends():
 
 @app.route("/api/market-structure")
 def market_structure():
-    return jsonify(analysis.get_market_structure())
+    start = request.args.get("start")
+    end = request.args.get("end")
+    return jsonify(analysis.get_market_structure(start, end))
 
 
 @app.route("/api/style-heat")
 def style_heat():
-    return jsonify(analysis.get_style_heat())
+    start = request.args.get("start")
+    end = request.args.get("end")
+    return jsonify(analysis.get_style_heat(start, end))
 
 
 @app.route("/api/decision-factors")
 def decision_factors():
-    return jsonify(analysis.get_decision_factors())
+    start = request.args.get("start")
+    end = request.args.get("end")
+    return jsonify(analysis.get_decision_factors(start, end))
 
 
 @app.route("/api/size-preference")
 def size_preference():
-    return jsonify(analysis.get_size_preference())
+    start = request.args.get("start")
+    end = request.args.get("end")
+    return jsonify(analysis.get_size_preference(start, end))
 
 
 @app.route("/api/realestate-correlation")
 def realestate_correlation():
     lag = int(request.args.get("lag", 9))
-    return jsonify(analysis.get_realestate_correlation(lag))
+    start = request.args.get("start")
+    end = request.args.get("end")
+    return jsonify(analysis.get_realestate_correlation(lag, start, end))
 
 
 @app.route("/api/export")

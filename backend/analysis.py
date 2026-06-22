@@ -131,8 +131,9 @@ def get_category_trends(start: str | None = None, end: str | None = None) -> dic
 # ---------------------------------------------------------------------------
 # 3. 市场结构（历史 + 预测）
 # ---------------------------------------------------------------------------
-def get_market_structure() -> dict:
+def get_market_structure(start: str | None = None, end: str | None = None) -> dict:
     df = _load("market_structure.csv")
+    df = _filter_months(df, start, end)
     df = df[df["month"] >= "2022-01"].reset_index(drop=True)
 
     history = [
@@ -156,17 +157,20 @@ def get_market_structure() -> dict:
 # ---------------------------------------------------------------------------
 # 4. 风格热度
 # ---------------------------------------------------------------------------
-def get_style_heat() -> dict:
-    df = _load("style_heat.csv")
+def get_style_heat(start: str | None = None, end: str | None = None) -> dict:
+    full_df = _load("style_heat.csv")
+    df = _filter_months(full_df, start, end)
     df = df[df["month"] >= "2022-01"].reset_index(drop=True)
     months = df["month"].tolist()
+    last_month = df.iloc[-1]["month"] if not df.empty else None
+    prev_month = _shift_month(last_month, -12) if last_month else None
+    prev_row = full_df[full_df["month"] == prev_month] if prev_month else pd.DataFrame()
     styles = []
     for col, label in STYLE_LABELS.items():
         vals = df[col].tolist()
-        # 同比：最后一期 vs 去年同期
-        last_val = vals[-1]
-        if len(vals) > 12:
-            prev_val = vals[-13]
+        last_val = vals[-1] if vals else 0.0
+        if not prev_row.empty:
+            prev_val = float(prev_row.iloc[0][col])
             yoy = round((last_val - prev_val) / prev_val * 100, 1) if prev_val else 0.0
         else:
             yoy = 0.0
@@ -177,7 +181,7 @@ def get_style_heat() -> dict:
 # ---------------------------------------------------------------------------
 # 5. 消费决策因素
 # ---------------------------------------------------------------------------
-def get_decision_factors() -> dict:
+def get_decision_factors(start: str | None = None, end: str | None = None) -> dict:
     df = _load("decision_factors.csv")
     axes = df["dimension"].unique().tolist()
     segments_by_dim = {}
@@ -205,7 +209,7 @@ def get_decision_factors() -> dict:
 # ---------------------------------------------------------------------------
 # 6. 尺寸偏好
 # ---------------------------------------------------------------------------
-def get_size_preference() -> dict:
+def get_size_preference(start: str | None = None, end: str | None = None) -> dict:
     df = _load("size_preference.csv")
     house_types = []
     for ht in ["小户型", "中户型", "大户型"]:
@@ -234,32 +238,36 @@ def _shift_month(month_str: str, delta: int) -> str:
     return f"{ny:04d}-{nm:02d}"
 
 
-def get_realestate_correlation(lag: int = 9) -> dict:
+def get_realestate_correlation(lag: int = 9, start: str | None = None, end: str | None = None) -> dict:
     df = _load("realestate_sales.csv")
+    df = _filter_months(df, start, end)
     df = df[df["month"] >= "2022-01"].reset_index(drop=True)
 
     delivery = df["new_house_delivery"].values
     sales = df["furniture_sales"].values
 
-    # 寻找最优滞后期（6-12 月）
-    best_lag = lag
-    best_corr = 0.0
+    # 寻找最优滞后期（6-12 月）— 仅用于参考展示
+    optimal_lag = lag
+    optimal_corr = 0.0
     for l in range(6, 13):
         if len(sales) > l:
             d_shifted = delivery[:-l]
             s_aligned = sales[l:]
             if len(d_shifted) > 2 and len(s_aligned) == len(d_shifted):
                 corr = float(np.corrcoef(d_shifted, s_aligned)[0, 1])
-                if abs(corr) > abs(best_corr):
-                    best_corr = corr
-                    best_lag = l
+                if abs(corr) > abs(optimal_corr):
+                    optimal_corr = corr
+                    optimal_lag = l
 
-    # 用最优滞后期计算相关系数
-    l = best_lag
+    # 使用用户选择的滞后期计算相关系数
+    l = lag
     if len(sales) > l:
         d_shifted = delivery[:-l]
         s_aligned = sales[l:]
-        correlation = float(np.corrcoef(d_shifted, s_aligned)[0, 1])
+        if len(d_shifted) > 2 and len(s_aligned) == len(d_shifted):
+            correlation = float(np.corrcoef(d_shifted, s_aligned)[0, 1])
+        else:
+            correlation = 0.0
     else:
         correlation = 0.0
 
@@ -268,7 +276,7 @@ def get_realestate_correlation(lag: int = 9) -> dict:
         for _, r in df.iterrows()
     ]
 
-    # 基于交付量预测未来 12 个月家具销售（用滞后期映射）
+    # 基于交付量预测未来 12 个月家具销售（用用户选择的滞后期映射）
     last_month = df.iloc[-1]["month"]
     forecast = []
     for i in range(1, 13):
@@ -286,7 +294,7 @@ def get_realestate_correlation(lag: int = 9) -> dict:
     return {
         "history": history,
         "correlation": round(correlation, 3),
-        "optimalLag": best_lag,
+        "optimalLag": optimal_lag,
         "forecast": forecast,
     }
 
@@ -296,17 +304,16 @@ def get_realestate_correlation(lag: int = 9) -> dict:
 # ---------------------------------------------------------------------------
 def get_export(module: str, start: str | None = None, end: str | None = None) -> str:
     mapping = {
-        "category-trends": ("category_sales.csv", get_category_trends),
-        "market-structure": ("market_structure.csv", None),
-        "style-heat": ("style_heat.csv", None),
-        "decision-factors": ("decision_factors.csv", None),
-        "size-preference": ("size_preference.csv", None),
-        "realestate-correlation": ("realestate_sales.csv", None),
+        "category-trends": "category_sales.csv",
+        "market-structure": "market_structure.csv",
+        "style-heat": "style_heat.csv",
+        "decision-factors": "decision_factors.csv",
+        "size-preference": "size_preference.csv",
+        "realestate-correlation": "realestate_sales.csv",
     }
     if module not in mapping:
         return ""
-    filename = mapping[module][0]
-    df = _load(filename)
-    if start or end:
+    df = _load(mapping[module])
+    if (start or end) and "month" in df.columns:
         df = _filter_months(df, start, end)
     return df.to_csv(index=False)

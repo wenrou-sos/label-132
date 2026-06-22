@@ -34,12 +34,40 @@ export const api = {
     const qs = q.toString();
     return fetchJson<CategoryTrendsData>(`/api/category-trends${qs ? `?${qs}` : ""}`);
   },
-  marketStructure: () => fetchJson<MarketStructureData>("/api/market-structure"),
-  styleHeat: () => fetchJson<StyleHeatData>("/api/style-heat"),
-  decisionFactors: () => fetchJson<DecisionFactorsData>("/api/decision-factors"),
-  sizePreference: () => fetchJson<SizePreferenceData>("/api/size-preference"),
-  realestateCorrelation: (lag = 9) =>
-    fetchJson<RealEstateData>(`/api/realestate-correlation?lag=${lag}`),
+  marketStructure: (start?: string, end?: string) => {
+    const q = new URLSearchParams();
+    if (start) q.set("start", start);
+    if (end) q.set("end", end);
+    const qs = q.toString();
+    return fetchJson<MarketStructureData>(`/api/market-structure${qs ? `?${qs}` : ""}`);
+  },
+  styleHeat: (start?: string, end?: string) => {
+    const q = new URLSearchParams();
+    if (start) q.set("start", start);
+    if (end) q.set("end", end);
+    const qs = q.toString();
+    return fetchJson<StyleHeatData>(`/api/style-heat${qs ? `?${qs}` : ""}`);
+  },
+  decisionFactors: (start?: string, end?: string) => {
+    const q = new URLSearchParams();
+    if (start) q.set("start", start);
+    if (end) q.set("end", end);
+    const qs = q.toString();
+    return fetchJson<DecisionFactorsData>(`/api/decision-factors${qs ? `?${qs}` : ""}`);
+  },
+  sizePreference: (start?: string, end?: string) => {
+    const q = new URLSearchParams();
+    if (start) q.set("start", start);
+    if (end) q.set("end", end);
+    const qs = q.toString();
+    return fetchJson<SizePreferenceData>(`/api/size-preference${qs ? `?${qs}` : ""}`);
+  },
+  realestateCorrelation: (lag = 9, start?: string, end?: string) => {
+    const q = new URLSearchParams({ lag: String(lag) });
+    if (start) q.set("start", start);
+    if (end) q.set("end", end);
+    return fetchJson<RealEstateData>(`/api/realestate-correlation?${q.toString()}`);
+  },
   exportCsv: (module: ModuleKey, start?: string, end?: string) => {
     const q = new URLSearchParams({ module });
     if (start) q.set("start", start);

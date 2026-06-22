@@ -28,11 +28,11 @@ interface DataState {
   cache: Map<string, CacheEntry<unknown>>;
   fetchSummary: (start?: string, end?: string) => Promise<void>;
   fetchCategoryTrends: (start?: string, end?: string) => Promise<void>;
-  fetchMarketStructure: () => Promise<void>;
-  fetchStyleHeat: () => Promise<void>;
-  fetchDecisionFactors: () => Promise<void>;
-  fetchSizePreference: () => Promise<void>;
-  fetchRealestate: (lag: number) => Promise<void>;
+  fetchMarketStructure: (start?: string, end?: string) => Promise<void>;
+  fetchStyleHeat: (start?: string, end?: string) => Promise<void>;
+  fetchDecisionFactors: (start?: string, end?: string) => Promise<void>;
+  fetchSizePreference: (start?: string, end?: string) => Promise<void>;
+  fetchRealestate: (lag: number, start?: string, end?: string) => Promise<void>;
   fetchAll: (start: string, end: string, lag: number) => Promise<void>;
   clearCache: () => void;
 }
@@ -83,50 +83,50 @@ export const useDataStore = create<DataState>((set, get) => ({
     }
   },
 
-  fetchMarketStructure: async () => {
+  fetchMarketStructure: async (start, end) => {
     try {
-      const key = "market";
-      const data = await cached(get().cache, key, () => api.marketStructure());
+      const key = `market-${start}-${end}`;
+      const data = await cached(get().cache, key, () => api.marketStructure(start, end));
       set({ marketStructure: data });
     } catch (e) {
       set({ error: String(e) });
     }
   },
 
-  fetchStyleHeat: async () => {
+  fetchStyleHeat: async (start, end) => {
     try {
-      const key = "style";
-      const data = await cached(get().cache, key, () => api.styleHeat());
+      const key = `style-${start}-${end}`;
+      const data = await cached(get().cache, key, () => api.styleHeat(start, end));
       set({ styleHeat: data });
     } catch (e) {
       set({ error: String(e) });
     }
   },
 
-  fetchDecisionFactors: async () => {
+  fetchDecisionFactors: async (start, end) => {
     try {
-      const key = "decision";
-      const data = await cached(get().cache, key, () => api.decisionFactors());
+      const key = `decision-${start}-${end}`;
+      const data = await cached(get().cache, key, () => api.decisionFactors(start, end));
       set({ decisionFactors: data });
     } catch (e) {
       set({ error: String(e) });
     }
   },
 
-  fetchSizePreference: async () => {
+  fetchSizePreference: async (start, end) => {
     try {
-      const key = "size";
-      const data = await cached(get().cache, key, () => api.sizePreference());
+      const key = `size-${start}-${end}`;
+      const data = await cached(get().cache, key, () => api.sizePreference(start, end));
       set({ sizePreference: data });
     } catch (e) {
       set({ error: String(e) });
     }
   },
 
-  fetchRealestate: async (lag) => {
+  fetchRealestate: async (lag, start, end) => {
     try {
-      const key = `realestate-${lag}`;
-      const data = await cached(get().cache, key, () => api.realestateCorrelation(lag));
+      const key = `realestate-${lag}-${start}-${end}`;
+      const data = await cached(get().cache, key, () => api.realestateCorrelation(lag, start, end));
       set({ realestate: data });
     } catch (e) {
       set({ error: String(e) });
@@ -139,11 +139,11 @@ export const useDataStore = create<DataState>((set, get) => ({
       await Promise.all([
         get().fetchSummary(start, end),
         get().fetchCategoryTrends(start, end),
-        get().fetchMarketStructure(),
-        get().fetchStyleHeat(),
-        get().fetchDecisionFactors(),
-        get().fetchSizePreference(),
-        get().fetchRealestate(lag),
+        get().fetchMarketStructure(start, end),
+        get().fetchStyleHeat(start, end),
+        get().fetchDecisionFactors(start, end),
+        get().fetchSizePreference(start, end),
+        get().fetchRealestate(lag, start, end),
       ]);
     } finally {
       set({ loading: false });
